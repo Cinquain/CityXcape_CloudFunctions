@@ -10,38 +10,93 @@ const db = admin.firestore()
 // https://firebase.google.com/docs/functions/get-started
 
 
-exports.checkOut = functions.firestore
-        .document("locations/{spotId}/checkins/{userId}")
-        .onDelete(async (snapshot, context) => {
+exports.newRequest = functions.firestore
+        .document("users/{ownerId}/requests/{userId}")
+        .onCreate(async (snapshot, context) => {
+            
+            const senderId = context.params.userId;
+            const ownerId = context.params.ownerId;
+            const data = snapshot.data();
+            const username = data.username;
+            const owner = await db.collection('users').doc(ownerId).get();
 
-            const spotId = context.params.spotId;
+            const ownerData = owner.data();
+            const fcmToken = ownerData.fcmToken;
+
+
+            const message = {
+                notification: {
+                    title: "New Request",
+                    body: username + " wants to connect with you",
+                },
+                data: {
+                    title: senderId,
+                },
+                token: fcmToken
+            };
+
+            await admin.messaging().send(message);
+
+        })
+
+
+exports.newStamp = functions.firestore
+        .document("locations/{spotId}/stamps/{userId}")
+        .onCreate(async (snapshot, context) => {
+
             const userId = context.params.userId;
-            const username = snapshot.data().username;
+            const data = snapshot.data();
+            const username = data.username;
+            const ownerId = data.ownerId;
+            const spotName = data.spotName;
 
-            const users = await db.collection('locations')
-                                  .doc(spotId)
-                                  .collection('checkins')
-                                  .get()
+            const owner = await db.collection('users').doc(ownerId).get();
+            const ownerData = owner.data();
+            const fcmToken = ownerData.fcmToken;
 
-            users.forEach(async (document) => {
-                let data = document.data()
-                const spotName = data.city;
-                const fcmToken = data.fcmToken;
+            const message = {
+                notification: {
+                    title: "Someone Found Your Spot",
+                    body: username + " checked in " + spotName,
+                },
+                data: {
+                    title: userId,
+                },
+                token: fcmToken
+            };
 
-                const message = {
-                            notification: {
-                                title: username + " just checked out",
-                                body: spotName,
-                            },
-                            data: {
-                                title: userId,
-                            },
-                            token: fcmToken
-                        };
+            await admin.messaging().send(message);
 
-    
-                await admin.messaging().send(message);
-            })
+        })
+
+exports.newMessage = functions.firestore
+        .document("messages/recentMessage/{toId}/{fromId}")
+        .onCreate(async (snapshot, context) => {
+
+            const toId = context.params.toId;
+            const fromId = context.params.fromId;
+            const data = snapshot.data();
+
+            const content = data.content;
+            const username = data.username;
+
+            const owner = await db.collection('users').doc(toId).get();
+            const fcmToken = owner.data().fcmToken;
+
+
+            const message = {
+                notification: {
+                    title: username,
+                    body: content,
+                },
+                data: {
+                    title: fromId,
+                },
+                token: fcmToken
+            };
+
+            await admin.messaging().send(message);
+
         })
 
 exports.newCheckin = functions.firestore
