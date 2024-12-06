@@ -40,6 +40,38 @@ exports.newRequest = functions.firestore
         })
 
 
+
+exports.newSale = functions.firestore
+        .document("locations/{spotId}/sales/{documentId}")
+        .onCreate(async (snapshot, context) => {
+
+            const spotId = context.params.spotId;
+            const data = snapshot.data();
+            const username = data.username;
+            const streetcred = data.streetcred;
+            const amount = streetcred * 0.15
+            const userId = data.id;
+            
+            const spot = await db.collection('locations').doc(spotId).get();
+            const fcmToken = spot.data().ownerFcm;
+            const spotName = spot.data().name;
+
+            const message = {
+                notification: {
+                    title: "New Sale at " + spotName,
+                    body: "You've made $" + amount,
+                },
+                data: {
+                    title: userId,
+                },
+                token: fcmToken
+            };
+
+            await admin.messaging().send(message);
+
+
+        })
+
 exports.newStamp = functions.firestore
         .document("locations/{spotId}/stamps/{userId}")
         .onCreate(async (snapshot, context) => {
